@@ -373,6 +373,25 @@
 
 	<!--
 		****************************************************************************
+		* Controls weather WPKG stops on first uninstall check with version compare.
+		* Some applications can be installed multiple times with different versions.
+		* Check only the first occurence or accept any valid comparison.
+		* Example is R for Windows.
+		*
+		* True : Any compare succeeds.
+		* False: First compare must succeed.
+		*
+		* Default value      : false
+		* Command-line switch: /anyLatest
+		****************************************************************************
+	-->
+	<!--
+		<param name='anyLatest' value='false' />
+	-->
+
+
+	<!--
+		****************************************************************************
 		* Controls weather WPKG prints some information about its progress to
 		* STDOUT. This output can be read by another program (GUI) to display some
 		* progress bar or additional status information to the user.
