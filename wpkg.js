@@ -96,6 +96,10 @@ var message = "" +
 "	Quit execution if the installation of any package was unsuccessful \n" +
 "	(default: install next package and show the error summary). \n" +
 "\n" +
+"/anyLatest[:<true>|<false>] \n" +
+"	Any uninstall version compare will succeed to detect install status \n" +
+"	of an application. \n" +
+"\n" +
 "/sendStatus[:<true>|<false>] \n" +
 "	Send status messages on STDOUT which can be parsed by calling program to \n" +
 "	display status information to the user. \n" +
@@ -392,6 +396,10 @@ var downloadTimeout = 7200;
 
 /** timeout for check execute */
 var checkExecuteTimeout = 600;
+
+/** FGCZ check uninstall for any found, in case of many possible uninstall entries
+    means, do not stop on first failed version compare. */
+var anyLatest = false;
 
 /** if set to true logfiles will be appended, otherwise they are overwritten */
 var logAppend = false;
@@ -1074,6 +1082,7 @@ function checkCondition(checkNode) {
 	var checkPath = checkNode.getAttribute("path");
 	var checkValue = checkNode.getAttribute("value");
 	var checkTimeout = checkNode.getAttribute("timeout");
+	var checkLookup = checkNode.getAttribute("lookup");
 
 	// In remote mode try to verify the check using cached check results in
 	// settings database.
@@ -1547,14 +1556,33 @@ function checkCondition(checkNode) {
 				throw new Error ("Uninstall entry version check has been specified but no" +
 						"'value' is defined. Please add a 'value=<version>' attribute.");
 			}
+			if ((checkLookup == null) {
+				checkLookup = anyLatest;
+			} else {
+				switch (checkLookup) {
+					case "one":
+						checkLookup = false;
+						break;
+					case "any":
+						checkLookup = true;
+						break;
+					default:
+						error("Unknown lookup value("+checkLookup+"). expected one,any. Using default: " + anyLatest);
+						checkLookup = anyLatest;
+						break;
+				}
+			}
 
 			if (uninstallLocations.length <= 0) {
 				dinfo("No uninstall entry for '" + checkPath + "' found. " +
 						"Version comparison check failed.");
 				returnValue = false;
 			} else {
-	
-				var uninstallCheckResult = true;
+				// FGCZ
+				// depending on value of "anyLatest" it stops on first wrong version
+				// anyLatest = false stop on First
+				// anyLatest = true check all found uninstall version in registry
+				var uninstallCheckResult = not(checkLookup);
 				for (var iUninstKey=0; iUninstKey < uninstallLocations.length; iUninstKey++) {
 					var uninstallValue = getRegistryValue(uninstallLocations[iUninstKey] + "\\DisplayVersion");
 	
@@ -1609,12 +1637,13 @@ function checkCondition(checkNode) {
 		
 						dinfo("Uninstall version check for package '" + checkPath + "' returned " +
 							uninstallVersionCompResult + " for operation type " + checkCond + ".");
-		
-						// in case the current entry does not match the condition,
-						// immediately return
+						// FGCZ
+						// in case the current entry does (not) match the condition,
+						// immediately return (anyLatest = false)
+						// check next (anyLatest = true)
 						// else the next uninstall entry might be checked
-						if (uninstallVersionCompResult == false) {
-							uninstallCheckResult = false;
+						if (uninstallVersionCompResult == checkLookup) {
+							uninstallCheckResult = checkLookup;
 							break;
 						}
 					}
@@ -7450,6 +7479,17 @@ function setRunningState(statename) {
 }
 
 /**
+ * Sets new value for the anyLatest flag which defines the Comparison
+ * check of uninstall with versions
+ * 
+ * @param newLatest
+ *            new value for the anyLatest flag (boolean)
+ */
+function setanyLatest(newLatest) {
+	anyLatest = newLatest;
+}
+
+/**
  * Sets new value for the sendStatus flag which defines if status messages are
  * sent to the calling program using STDOUT
  * 
@@ -8760,6 +8800,11 @@ function parseArguments(argv) {
 			setQuitOnError(true);
 			break;
 
+		// Define how uninstall version compare behaves
+		case "/anyLatest":
+			setAnyLatest(true);
+			break;
+
 		// Check if status messages should be sent.
 		case "/sendStatus":
 			setSendStatus(true);
@@ -8917,6 +8962,16 @@ function parseArguments(argv) {
 			setQuitOnError(true);
 		} else if (quitonerrorFlagValue == "false"){
 			setQuitOnError(false);
+		}
+	}
+
+	// Process anyLatest mode flag.
+	var anyLatestFlagValue = argn.Item("anyLatest");
+	if (anyLatestFlagValue != null) {
+		if (anyLatestFlagValue) {
+			setAnyLatest(true);
+		} else if (anyLatestFlagValue == "false"){
+			setAnyLatest(false);
 		}
 	}
 
